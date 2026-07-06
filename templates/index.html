@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Audio Analysis Lab</title>
+    <link rel="stylesheet" href="/static/app.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#workspace">跳到上传区域</a>
+    <main class="page-shell">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Audio Analysis Lab</p>
+          <h1>从一段 WAV 开始理解声音</h1>
+          <p class="hero-text">上传常见音频格式，查看波形、采样率、声道和幅度信息，为音高识别、和弦识别、节拍分析和音轨分离打基础。</p>
+        </div>
+        <div class="hero-visual" aria-hidden="true">
+          <div class="orbital-line"></div>
+          <div class="spectrum-bars">
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="workspace" id="workspace">
+        <div class="upload-panel" id="dropZone">
+          <div class="upload-icon" aria-hidden="true">
+            <span></span>
+          </div>
+          <input id="fileInput" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,audio/*" hidden>
+          <button class="upload-button" id="uploadButton" type="button">选择音频文件</button>
+          <p id="fileLabel">也可以把文件拖到这里</p>
+          <p class="status" id="statusText" aria-live="polite">等待上传</p>
+        </div>
+
+        <div class="waveform-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow" id="viewEyebrow">Waveform</p>
+              <h2 id="viewTitle">波形视图</h2>
+            </div>
+            <div class="view-switch" role="group" aria-label="视图切换">
+              <button class="view-switch-button is-active" data-view="waveform" type="button">波形</button>
+              <button class="view-switch-button" data-view="spectrogram" type="button">频谱图</button>
+              <button class="view-switch-button" data-view="features" type="button">特征分析</button>
+            </div>
+          </div>
+          <div class="transport-bar">
+            <audio id="audioPlayer"></audio>
+            <button class="transport-button" id="playButton" type="button" disabled>播放</button>
+            <span class="time-readout" id="currentTime">00:00</span>
+            <input class="progress-slider" id="progressSlider" type="range" min="0" max="1000" value="0" disabled aria-label="播放进度">
+            <span class="time-readout" id="totalTime">00:00</span>
+          </div>
+          <div class="zoom-bar">
+            <label for="zoomSlider">水平缩放</label>
+            <input class="zoom-slider" id="zoomSlider" type="range" min="1" max="12" value="1" step="0.5" disabled>
+            <span id="zoomValue">1x</span>
+            <button class="reset-zoom-button" id="resetZoomButton" type="button" disabled>重置</button>
+            <label class="follow-toggle is-disabled" for="followToggle">
+              <input id="followToggle" type="checkbox" checked disabled>
+              <span class="follow-track" aria-hidden="true"></span>
+              <span>跟随</span>
+            </label>
+          </div>
+          <div class="spectrogram-controls is-hidden" id="spectrogramControls" aria-label="频谱参数">
+            <label>
+              <span>FFT 大小</span>
+              <select id="fftSizeSelect">
+                <option value="512">512</option>
+                <option value="1024" selected>1024</option>
+                <option value="2048">2048</option>
+                <option value="4096">4096</option>
+              </select>
+            </label>
+            <label>
+              <span>Hop Size</span>
+              <select id="hopSizeSelect">
+                <option value="128">128</option>
+                <option value="256">256</option>
+                <option value="512" selected>512</option>
+                <option value="1024">1024</option>
+              </select>
+            </label>
+            <label>
+              <span>频率范围</span>
+              <select id="maxFrequencySelect">
+                <option value="2000">2 kHz</option>
+                <option value="4000">4 kHz</option>
+                <option value="8000">8 kHz</option>
+                <option value="12000" selected>12 kHz</option>
+                <option value="20000">20 kHz</option>
+              </select>
+            </label>
+          </div>
+          <div class="spectrogram-readout is-hidden" id="spectrogramReadout" aria-live="polite">
+            <span>时间 <strong id="readoutTime">--:--</strong></span>
+            <span>频率 <strong id="readoutFrequency">-- Hz</strong></span>
+            <span>强度 <strong id="readoutIntensity">--</strong></span>
+          </div>
+          <canvas id="waveformCanvas" width="1200" height="360" aria-label="音频波形，点击可跳转播放位置"></canvas>
+          <div class="feature-panel is-hidden" id="featurePanel" aria-live="polite"></div>
+        </div>
+
+        <div class="metadata-grid" id="metadataGrid" aria-live="polite"></div>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
