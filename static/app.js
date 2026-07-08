@@ -1,11 +1,18 @@
 const fileInput = document.querySelector("#fileInput");
 const uploadButton = document.querySelector("#uploadButton");
 const dropZone = document.querySelector("#dropZone");
+const modeSingle = document.querySelector("#modeSingle");
+const modeCompare = document.querySelector("#modeCompare");
+const compareUploadPanel = document.querySelector("#compareUploadPanel");
+const compareFileA = document.querySelector("#compareFileA");
+const compareFileB = document.querySelector("#compareFileB");
+const compareButton = document.querySelector("#compareButton");
 const fileLabel = document.querySelector("#fileLabel");
 const statusText = document.querySelector("#statusText");
 const metadataGrid = document.querySelector("#metadataGrid");
 const canvas = document.querySelector("#waveformCanvas");
 const featurePanel = document.querySelector("#featurePanel");
+const comparisonPanel = document.querySelector("#comparisonPanel");
 const viewEyebrow = document.querySelector("#viewEyebrow");
 const viewTitle = document.querySelector("#viewTitle");
 const viewSwitchButtons = document.querySelectorAll(".view-switch-button");
@@ -18,6 +25,11 @@ const zoomSlider = document.querySelector("#zoomSlider");
 const zoomValue = document.querySelector("#zoomValue");
 const resetZoomButton = document.querySelector("#resetZoomButton");
 const followToggle = document.querySelector("#followToggle");
+const selectionReadout = document.querySelector("#selectionReadout");
+const analyzeSelectionButton = document.querySelector("#analyzeSelectionButton");
+const clearSelectionButton = document.querySelector("#clearSelectionButton");
+const exportMarkdownButton = document.querySelector("#exportMarkdownButton");
+const exportJsonButton = document.querySelector("#exportJsonButton");
 const spectrogramControls = document.querySelector("#spectrogramControls");
 const spectrogramReadout = document.querySelector("#spectrogramReadout");
 const readoutTime = document.querySelector("#readoutTime");
@@ -50,6 +62,12 @@ let spectrogramHover = null;
 let renderedPitchFrameIndex = -1;
 let featureHover = null;
 let featureSelection = null;
+let currentMode = "single";
+let selectedRange = null;
+let isSelectingRange = false;
+let selectionAnchorRatio = 0;
+let suppressNextCanvasClick = false;
+let currentComparison = null;
 
 const viewLabels = {
   waveform: { eyebrow: "Waveform", title: "波形视图" },
@@ -98,6 +116,35 @@ function renderMetadata(metadata) {
       <strong>${formatValue(key, metadata[key])}</strong>
     </article>
   `).join("");
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  modeSingle.classList.toggle("is-active", mode === "single");
+  modeCompare.classList.toggle("is-active", mode === "compare");
+  compareUploadPanel.classList.toggle("is-hidden", mode !== "compare");
+  comparisonPanel.classList.toggle("is-hidden", mode !== "compare" || !currentComparison);
+}
+
+function setReportControlsEnabled(enabled) {
+  exportMarkdownButton.disabled = !enabled;
+  exportJsonButton.disabled = !enabled;
+}
+
+function setSelectionControlsEnabled(enabled) {
+  analyzeSelectionButton.disabled = !enabled;
+  clearSelectionButton.disabled = !enabled;
+}
+
+function updateSelectionReadout() {
+  if (!selectedRange) {
+    selectionReadout.textContent = "选区：未选择";
+    setSelectionControlsEnabled(false);
+    return;
+  }
+
+  selectionReadout.textContent = `选区：${formatTime(selectedRange.startTime)} - ${formatTime(selectedRange.endTime)}`;
+  setSelectionControlsEnabled(true);
 }
 
 function resizeCanvas() {
@@ -424,7 +471,28 @@ function drawWaveform(points = currentWaveform) {
     context.stroke();
   });
 
+  drawSelectionOverlay(range, padding, usableWidth, height, currentWaveform.length);
   drawPlayhead(range, padding, usableWidth, height, currentWaveform.length);
+}
+
+function drawSelectionOverlay(range, padding, usableWidth, height, totalCount) {
+  if (!selectedRange || !audioPlayer.duration || totalCount === 0) return;
+
+  const startIndex = (selectedRange.startTime / audioPlayer.duration) * totalCount;
+  const endIndex = (selectedRange.endTime / audioPlayer.duration) * totalCount;
+  const left = padding + ((startIndex - range.startOffset) / Math.max(1, range.visibleCount)) * usableWidth;
+  const right = padding + ((endIndex - range.startOffset) / Math.max(1, range.visibleCount)) * usableWidth;
+  const x = Math.max(padding, Math.min(left, right));
+  const width = Math.min(padding + usableWidth, Math.max(left, right)) - x;
+  if (width <= 0) return;
+
+  context.save();
+  context.fillStyle = "rgba(45, 212, 191, 0.16)";
+  context.strokeStyle = "rgba(45, 212, 191, 0.62)";
+  context.lineWidth = 1;
+  context.fillRect(x, 20, width, height - 40);
+  context.strokeRect(x, 20, width, height - 40);
+  context.restore();
 }
 
 function getSpectrogramColor(value) {
@@ -669,8 +737,8 @@ function renderFeatureCards(features, force = false) {
   featurePanel.innerHTML = `
     <article class="feature-card">
       <span>Pitch</span>
-      <strong>${pitch.note} / ${pitch.frequency.toFixed(2)} Hz</strong>
-      <p>当前 ${formatTime(pitch.time || 0)}，置信度 ${Math.round(pitch.confidence * 100)}%。用于单音、人声和旋律估计。</p>
+      <strong>${pitch.tuningLabel || pitch.note} / ${pitch.frequency.toFixed(2)} Hz</strong>
+      <p>当前 ${formatTime(pitch.time || 0)}，置信度 ${Math.round(pitch.confidence * 100)}%。显示最近音名和 cents 偏移。</p>
     </article>
     <article class="feature-card">
       <span>Loudness</span>
@@ -694,7 +762,7 @@ function renderFeatureCards(features, force = false) {
     <article class="feature-card">
       <span>Quality</span>
       <strong>${quality.isClipped ? "检测到削波" : "未检测到削波"}</strong>
-      <p>最大峰值 ${quality.maxPeak.toFixed(4)}，静音帧 ${quality.silenceFrameCount}，削波采样 ${quality.clippedSampleCount}。用于发现录音风险。</p>
+      <p>LUFS 近似 ${quality.lufsApprox}，动态 ${quality.dynamicRangeDb} dB，噪声底 ${quality.noiseFloorDb} dB。${(quality.recommendations || []).join(" ")}</p>
     </article>
   `;
 }
@@ -762,16 +830,42 @@ function seekToRatio(ratio) {
   drawCurrentVisualization();
 }
 
+function getCanvasRatio(event) {
+  const rect = canvas.getBoundingClientRect();
+  const padding = 24;
+  const x = Math.min(rect.width - padding, Math.max(padding, event.clientX - rect.left));
+  const total = getTimelineLength();
+  const range = getVisibleRange(total);
+  const visibleRatio = (x - padding) / Math.max(1, rect.width - padding * 2);
+  const globalIndex = range.startOffset + visibleRatio * Math.max(1, range.visibleCount);
+  return Math.min(1, Math.max(0, globalIndex / Math.max(1, total)));
+}
+
+function setSelectedRangeFromRatios(startRatio, endRatio) {
+  if (!audioPlayer.duration) return;
+  const start = Math.min(startRatio, endRatio) * audioPlayer.duration;
+  const end = Math.max(startRatio, endRatio) * audioPlayer.duration;
+  if (end - start < 0.05) return;
+  selectedRange = { startTime: start, endTime: end };
+  updateSelectionReadout();
+}
+
 async function analyzeFile(file) {
   if (!file) return;
 
   currentFile = file;
   currentSpectrogram = null;
   currentFeatures = null;
+  currentComparison = null;
+  selectedRange = null;
   spectrogramCache = new Map();
   isSpectrogramLoading = false;
   isFeaturesLoading = false;
   renderFeatureCards(null);
+  comparisonPanel.classList.add("is-hidden");
+  comparisonPanel.innerHTML = "";
+  updateSelectionReadout();
+  setReportControlsEnabled(false);
   clearSpectrogramSelection();
   clearFeatureInteraction();
   setActiveViewMode("waveform");
@@ -800,6 +894,7 @@ async function analyzeFile(file) {
     currentMetadata = payload.metadata;
     currentWaveform = payload.waveform;
     resetPlaybackState(file);
+    setReportControlsEnabled(true);
     drawCurrentVisualization();
     setStatus("波形分析完成，可以播放、拖动进度、缩放波形或切换频谱图。", "success");
   } catch (error) {
@@ -809,7 +904,10 @@ async function analyzeFile(file) {
     currentSpectrogram = null;
     currentFeatures = null;
     currentMetadata = null;
+    selectedRange = null;
     renderFeatureCards(null);
+    updateSelectionReadout();
+    setReportControlsEnabled(false);
     clearFeatureInteraction();
     enablePlayerControls(false);
     drawEmptyWaveform();
@@ -921,6 +1019,127 @@ async function loadSpectrogramIfNeeded() {
     }
   }
 }
+
+async function analyzeSelectedRange() {
+  if (!currentFile || !selectedRange) return;
+
+  const formData = new FormData();
+  formData.append("file", currentFile);
+  const query = new URLSearchParams({
+    startTime: selectedRange.startTime.toFixed(4),
+    endTime: selectedRange.endTime.toFixed(4),
+  }).toString();
+
+  try {
+    setStatus("正在分析选区...", "neutral");
+    const response = await fetch(`/api/features?${query}`, { method: "POST", body: formData });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `请求失败：HTTP ${response.status}`);
+    currentFeatures = payload.features;
+    renderFeatureCards(currentFeatures, true);
+    setActiveViewMode("features");
+    setStatus("选区特征分析完成。", "success");
+    drawCurrentVisualization();
+  } catch (error) {
+    setStatus(error.message, "error");
+  }
+}
+
+async function exportCurrentReport(format) {
+  const analysis = {
+    metadata: currentMetadata || {},
+    features: currentFeatures || {},
+    comparison: currentComparison || null,
+    selection: selectedRange || null,
+  };
+
+  try {
+    const response = await fetch("/api/report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ format, analysis }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `请求失败：HTTP ${response.status}`);
+    downloadText(`audioanylysis-report.${format === "json" ? "json" : "md"}`, payload.report);
+  } catch (error) {
+    setStatus(error.message, "error");
+  }
+}
+
+function downloadText(filename, text) {
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+async function compareFiles() {
+  const fileA = compareFileA.files[0];
+  const fileB = compareFileB.files[0];
+  if (!fileA || !fileB) {
+    setStatus("请选择两个音频文件进行 A/B 对比。", "error");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("fileA", fileA);
+  formData.append("fileB", fileB);
+  try {
+    compareButton.disabled = true;
+    setStatus("正在生成 A/B 对比...", "neutral");
+    const response = await fetch("/api/compare", { method: "POST", body: formData });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `请求失败：HTTP ${response.status}`);
+    currentComparison = payload.comparison;
+    renderComparison(currentComparison);
+    comparisonPanel.classList.remove("is-hidden");
+    setReportControlsEnabled(true);
+    setStatus("A/B 对比完成。", "success");
+  } catch (error) {
+    setStatus(error.message, "error");
+  } finally {
+    compareButton.disabled = false;
+  }
+}
+
+function renderComparison(comparison) {
+  const a = comparison.fileA.features;
+  const b = comparison.fileB.features;
+  const diff = comparison.differences;
+  comparisonPanel.innerHTML = `
+    <article class="comparison-card">
+      <span>File A</span>
+      <strong>${a.pitch.tuningLabel || a.pitch.note} / ${a.tempo.bpm.toFixed(1)} BPM</strong>
+      <p>RMS ${a.loudness.maxRms.toFixed(4)}，高频 ${Math.round(a.bandEnergy.high * 100)}%。</p>
+    </article>
+    <article class="comparison-card">
+      <span>File B</span>
+      <strong>${b.pitch.tuningLabel || b.pitch.note} / ${b.tempo.bpm.toFixed(1)} BPM</strong>
+      <p>RMS ${b.loudness.maxRms.toFixed(4)}，高频 ${Math.round(b.bandEnergy.high * 100)}%。</p>
+    </article>
+    <article class="comparison-card">
+      <span>Difference</span>
+      <strong>更响：${diff.louder} / 高频更多：${diff.moreHighFrequency}</strong>
+      <p>节奏更快：${diff.fasterTempo}，音高范围更高：${diff.pitchRange.higher}。</p>
+    </article>
+  `;
+}
+
+modeSingle.addEventListener("click", () => setMode("single"));
+modeCompare.addEventListener("click", () => setMode("compare"));
+compareButton.addEventListener("click", compareFiles);
+analyzeSelectionButton.addEventListener("click", analyzeSelectedRange);
+clearSelectionButton.addEventListener("click", () => {
+  selectedRange = null;
+  updateSelectionReadout();
+  drawCurrentVisualization();
+});
+exportMarkdownButton.addEventListener("click", () => exportCurrentReport("markdown"));
+exportJsonButton.addEventListener("click", () => exportCurrentReport("json"));
 
 uploadButton.addEventListener("click", () => fileInput.click());
 
@@ -1044,6 +1263,11 @@ viewSwitchButtons.forEach((button) => {
 });
 
 canvas.addEventListener("click", (event) => {
+  if (suppressNextCanvasClick) {
+    suppressNextCanvasClick = false;
+    return;
+  }
+  if (isSelectingRange) return;
   const total = getTimelineLength();
   if (!audioPlayer.duration || total === 0) return;
 
@@ -1075,7 +1299,30 @@ canvas.addEventListener("click", (event) => {
   seekToRatio(globalIndex / total);
 });
 
+canvas.addEventListener("pointerdown", (event) => {
+  if (currentViewMode !== "waveform" || !audioPlayer.duration || currentWaveform.length === 0) return;
+
+  isSelectingRange = true;
+  selectionAnchorRatio = getCanvasRatio(event);
+});
+
+canvas.addEventListener("pointerup", (event) => {
+  if (!isSelectingRange) return;
+
+  const endRatio = getCanvasRatio(event);
+  isSelectingRange = false;
+  setSelectedRangeFromRatios(selectionAnchorRatio, endRatio);
+  suppressNextCanvasClick = true;
+  drawCurrentVisualization();
+});
+
 canvas.addEventListener("pointermove", (event) => {
+  if (isSelectingRange && currentViewMode === "waveform" && audioPlayer.duration) {
+    setSelectedRangeFromRatios(selectionAnchorRatio, getCanvasRatio(event));
+    drawCurrentVisualization();
+    return;
+  }
+
   if (currentViewMode === "features" && currentFeatures) {
     const rect = canvas.getBoundingClientRect();
     featureHover = {
@@ -1098,6 +1345,7 @@ canvas.addEventListener("pointermove", (event) => {
 });
 
 canvas.addEventListener("pointerleave", () => {
+  isSelectingRange = false;
   if (currentViewMode === "features") {
     featureHover = null;
     renderFeatureCards(currentFeatures, true);

@@ -4,7 +4,10 @@ from tempfile import NamedTemporaryFile
 from flask import Flask, jsonify, render_template, request
 
 from audio_reader import read_wav_file
+from comparison_analysis import compare_audio_records
 from feature_analysis import analyze_audio_features
+from report_export import export_report
+from selection_analysis import parse_time_range
 from spectrum import build_spectrogram
 from spectrum_options import parse_spectrogram_options
 from validators import validate_wav_upload
@@ -88,11 +91,40 @@ def analyze_features():
 
     try:
         audio = read_uploaded_audio(upload)
-        features = analyze_audio_features(audio["samples"], audio["sample_rate"])
+        start_time, end_time = parse_time_range(request.args)
+        features = analyze_audio_features(audio["samples"], audio["sample_rate"], start_time, end_time)
 
         return jsonify({"features": features})
     except Exception:
         return jsonify({"error": "特征分析失败，请确认文件是有效的音频。"}), 400
+
+
+@app.post("/api/compare")
+def compare_audio():
+    upload_a = request.files.get("fileA")
+    upload_b = request.files.get("fileB")
+    valid_a, message_a = validate_wav_upload(upload_a)
+    valid_b, message_b = validate_wav_upload(upload_b)
+    if not valid_a:
+        return jsonify({"error": message_a}), 400
+    if not valid_b:
+        return jsonify({"error": message_b}), 400
+
+    try:
+        audio_a = read_uploaded_audio(upload_a)
+        audio_b = read_uploaded_audio(upload_b)
+        comparison = compare_audio_records(audio_a, audio_b)
+        return jsonify({"comparison": comparison})
+    except Exception:
+        return jsonify({"error": "对比分析失败，请确认两个文件都是有效的音频。"}), 400
+
+
+@app.post("/api/report")
+def export_audio_report():
+    payload = request.get_json(silent=True) or {}
+    report_format = payload.get("format", "markdown")
+    analysis = payload.get("analysis", {})
+    return jsonify({"format": report_format, "report": export_report(analysis, report_format)})
 
 
 if __name__ == "__main__":

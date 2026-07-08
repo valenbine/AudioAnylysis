@@ -6,10 +6,11 @@ import soundfile as sf
 from app import app, get_upload_suffix
 
 
-def make_wav_upload():
+def make_wav_upload(frequency=440, amplitude=0.5, duration=1.0, sample_rate=8000):
     buffer = BytesIO()
-    samples = np.array([0.0, 0.5, -0.5, 1.0], dtype=np.float32)
-    sf.write(buffer, samples, 8000, format="WAV", subtype="FLOAT")
+    time = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+    samples = (amplitude * np.sin(2 * np.pi * frequency * time)).astype(np.float32)
+    sf.write(buffer, samples, sample_rate, format="WAV", subtype="FLOAT")
     buffer.seek(0)
     return buffer
 
@@ -27,6 +28,10 @@ def test_index_page_loads():
     assert "data-view=\"waveform\"" in html
     assert "data-view=\"spectrogram\"" in html
     assert "data-view=\"features\"" in html
+    assert "modeCompare" in html
+    assert "analyzeSelectionButton" in html
+    assert "exportMarkdownButton" in html
+    assert "exportJsonButton" in html
     assert "fftSizeSelect" in html
     assert "hopSizeSelect" in html
     assert "maxFrequencySelect" in html
@@ -59,7 +64,7 @@ def test_analyze_returns_waveform_and_metadata_for_wav():
     assert payload["metadata"]["sampleRate"] == 8000
     assert payload["metadata"]["channels"] == 1
     assert payload["metadata"]["pointCount"] > 0
-    assert payload["waveform"][0] == {"min": 0.0, "max": 0.0}
+    assert payload["waveform"][0]["max"] >= payload["waveform"][0]["min"]
     assert "spectrogram" not in payload
 
 
@@ -109,9 +114,58 @@ def test_features_returns_audio_feature_groups_for_wav():
     payload = response.get_json()
 
     assert response.status_code == 200
-    assert set(payload["features"]) == {"pitch", "loudness", "bandEnergy", "quality", "tempo"}
+    assert set(payload["features"]) == {"pitch", "loudness", "bandEnergy", "quality", "tempo", "selection"}
     assert {"bpm", "confidence", "beatTimes"}.issubset(payload["features"]["tempo"])
     assert payload["features"]["loudness"]["frameCount"] > 0
+
+
+def test_features_accepts_time_selection_for_wav():
+    client = app.test_client()
+
+    response = client.post(
+        "/api/features?startTime=0.25&endTime=0.75",
+        data={"file": (make_wav_upload(duration=2.0), "tone.wav")},
+        content_type="multipart/form-data",
+    )
+
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["features"]["selection"] == {"startTime": 0.25, "endTime": 0.75, "duration": 0.5}
+    assert "cents" in payload["features"]["pitch"]
+    assert "lufsApprox" in payload["features"]["quality"]
+
+
+def test_compare_returns_two_audio_summaries_and_differences():
+    client = app.test_client()
+
+    response = client.post(
+        "/api/compare",
+        data={
+            "fileA": (make_wav_upload(frequency=220, amplitude=0.2), "a.wav"),
+            "fileB": (make_wav_upload(frequency=440, amplitude=0.8), "b.wav"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert set(payload["comparison"]) == {"fileA", "fileB", "differences"}
+    assert payload["comparison"]["differences"]["louder"] == "B"
+    assert "pitchRange" in payload["comparison"]["differences"]
+
+
+def test_report_exports_markdown_and_json():
+    client = app.test_client()
+
+    response = client.post(
+        "/api/report",
+        json={"format": "markdown", "analysis": {"metadata": {"duration": 1}, "features": {"tempo": {"bpm": 120}}}},
+    )
+
+    assert response.status_code == 200
+    assert "# AudioAnylysis Report" in response.get_json()["report"]
 
 
 def test_app_does_not_set_upload_size_limit():

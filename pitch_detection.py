@@ -31,11 +31,13 @@ def detect_pitch(samples, sample_rate, min_frequency=60, max_frequency=2000):
     frequency = adjust_for_subharmonic(windowed, sample_rate, frequency, min_frequency)
     confidence = float(correlation[peak_lag])
 
-    return {
+    result = {
         "frequency": round(frequency, 2),
         "note": frequency_to_note(frequency),
         "confidence": round(min(1, max(0, confidence)), 3),
     }
+    result.update(pitch_calibration(frequency))
+    return result
 
 
 def first_prominent_peak(values, threshold=0.28):
@@ -94,6 +96,9 @@ def build_pitch_curve(samples, sample_rate, frame_size=4096, hop_size=1024):
             "frequency": pitch["frequency"],
             "note": pitch["note"],
             "confidence": pitch["confidence"],
+            "nearestNote": pitch["nearestNote"],
+            "cents": pitch["cents"],
+            "tuningLabel": pitch["tuningLabel"],
         })
 
     voiced_frames = [frame for frame in frames if frame["frequency"] > 0]
@@ -103,6 +108,9 @@ def build_pitch_curve(samples, sample_rate, frame_size=4096, hop_size=1024):
             "frequency": summary["frequency"],
             "note": summary["note"],
             "confidence": summary["confidence"],
+            "nearestNote": summary["nearestNote"],
+            "cents": summary["cents"],
+            "tuningLabel": summary["tuningLabel"],
         }
     else:
         summary = {"frequency": 0, "note": "--", "confidence": 0}
@@ -124,3 +132,15 @@ def frequency_to_note(frequency):
     midi = int(round(69 + 12 * math.log2(frequency / 440)))
     octave = midi // 12 - 1
     return f"{NOTE_NAMES[midi % 12]}{octave}"
+
+
+def pitch_calibration(frequency):
+    if frequency <= 0:
+        return {"nearestNote": "--", "cents": 0, "tuningLabel": "--"}
+
+    midi_float = 69 + 12 * math.log2(frequency / 440)
+    midi = int(round(midi_float))
+    cents = round((midi_float - midi) * 100)
+    note = f"{NOTE_NAMES[midi % 12]}{midi // 12 - 1}"
+    sign = "+" if cents >= 0 else "-"
+    return {"nearestNote": note, "cents": cents, "tuningLabel": f"{note} {sign}{abs(cents)} cents"}

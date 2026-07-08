@@ -25,6 +25,10 @@
 
       <section class="workspace" id="workspace">
         <div class="upload-panel" id="dropZone">
+          <div class="mode-switch" role="group" aria-label="分析模式">
+            <button class="mode-button is-active" id="modeSingle" type="button">单文件分析</button>
+            <button class="mode-button" id="modeCompare" type="button">A/B 对比</button>
+          </div>
           <div class="upload-icon" aria-hidden="true">
             <span></span>
           </div>
@@ -32,6 +36,11 @@
           <button class="upload-button" id="uploadButton" type="button">选择音频文件</button>
           <p id="fileLabel">也可以把文件拖到这里</p>
           <p class="status" id="statusText" aria-live="polite">等待上传</p>
+          <div class="compare-upload is-hidden" id="compareUploadPanel">
+            <input id="compareFileA" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,audio/*">
+            <input id="compareFileB" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,audio/*">
+            <button class="upload-button" id="compareButton" type="button">开始 A/B 对比</button>
+          </div>
         </div>
 
         <div class="waveform-panel">
@@ -63,6 +72,13 @@
               <span class="follow-track" aria-hidden="true"></span>
               <span>跟随</span>
             </label>
+          </div>
+          <div class="selection-bar">
+            <span id="selectionReadout">选区：未选择</span>
+            <button class="reset-zoom-button" id="analyzeSelectionButton" type="button" disabled>分析选区</button>
+            <button class="reset-zoom-button" id="clearSelectionButton" type="button" disabled>清除选区</button>
+            <button class="reset-zoom-button" id="exportMarkdownButton" type="button" disabled>导出 Markdown</button>
+            <button class="reset-zoom-button" id="exportJsonButton" type="button" disabled>导出 JSON</button>
           </div>
           <div class="spectrogram-controls is-hidden" id="spectrogramControls" aria-label="频谱参数">
             <label>
@@ -101,6 +117,7 @@
           </div>
           <canvas id="waveformCanvas" width="1200" height="360" aria-label="音频波形，点击可跳转播放位置"></canvas>
           <div class="feature-panel is-hidden" id="featurePanel" aria-live="polite"></div>
+          <div class="comparison-panel is-hidden" id="comparisonPanel" aria-live="polite"></div>
         </div>
 
         <div class="metadata-grid" id="metadataGrid" aria-live="polite"></div>

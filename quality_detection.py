@@ -1,16 +1,20 @@
 import numpy as np
 
+from quality_metrics import build_quality_metrics
+
 
 def detect_quality_issues(samples, sample_rate, frame_size=2048, hop_size=1024):
     samples = np.asarray(samples, dtype=np.float32).reshape(-1)
     if samples.size == 0:
-        return {
+        result = {
             "maxPeak": 0,
             "isClipped": False,
             "clippedSampleCount": 0,
             "silenceFrameCount": 0,
             "silenceSegments": [],
         }
+        result.update(build_quality_metrics(samples))
+        return result
 
     abs_samples = np.abs(samples)
     clipped = abs_samples >= 0.999
@@ -37,13 +41,15 @@ def detect_quality_issues(samples, sample_rate, frame_size=2048, hop_size=1024):
     if active_segment is not None:
         silence_segments.append(round_segment(active_segment))
 
-    return {
+    result = {
         "maxPeak": round(float(np.max(abs_samples)), 4),
         "isClipped": bool(np.any(clipped)),
         "clippedSampleCount": int(np.count_nonzero(clipped)),
         "silenceFrameCount": silence_count,
         "silenceSegments": silence_segments[:20],
     }
+    result.update(build_quality_metrics(samples))
+    return result
 
 
 def round_segment(segment):

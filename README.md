@@ -13,6 +13,11 @@ AudioAnylysis is a Flask-based audio analysis learning app. It lets you upload c
 - Estimate tempo/BPM from onset energy and show beat markers.
 - Compare low, mid, and high frequency energy ratios.
 - Detect silence frames, peak level, and clipping risk.
+- Select a time range on the waveform and analyze only that segment.
+- Compare two audio files side by side with A/B difference summaries.
+- Export analysis reports as Markdown or JSON.
+- Show pitch calibration with nearest note and cents offset.
+- Estimate noise floor, dynamic range, and approximate LUFS with recording recommendations.
 
 ## Tech Stack
 
@@ -78,6 +83,19 @@ Accepts a multipart upload field named `file` and returns:
 - `quality`: silence, peak, and clipping indicators
 - `tempo`: BPM estimate, confidence, and beat times
 
+Optional query parameters:
+
+- `startTime`: selection start in seconds
+- `endTime`: selection end in seconds
+
+### `POST /api/compare`
+
+Accepts multipart upload fields named `fileA` and `fileB`. Returns both audio summaries and differences for loudness, high-frequency energy, tempo, and pitch range.
+
+### `POST /api/report`
+
+Accepts JSON with `format` (`markdown` or `json`) and an `analysis` object. Returns a shareable report string.
+
 ## Project Structure
 
 ```text
@@ -92,6 +110,11 @@ loudness_analysis.py    RMS and peak loudness curves
 band_energy.py          Low/mid/high band energy ratios
 quality_detection.py    Silence, peak, and clipping checks
 tempo_detection.py      BPM and beat time estimation
+comparison_analysis.py  A/B audio summary and difference analysis
+report_export.py        Markdown and JSON report export
+selection_analysis.py   Time-range parsing and sample slicing
+music_theory.py         Pitch calibration helpers
+quality_metrics.py      Noise floor, dynamic range, and LUFS estimates
 templates/index.html    Application shell
 static/app.css          UI styling
 static/app.js           Browser interactions and canvas rendering
