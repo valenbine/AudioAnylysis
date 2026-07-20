@@ -207,6 +207,7 @@ h2 {
 }
 
 .upload-panel {
+  align-self: start;
   display: flex;
   min-height: 360px;
   flex-direction: column;
@@ -251,6 +252,16 @@ h2 {
   background: linear-gradient(135deg, var(--accent), var(--accent-strong));
 }
 
+.single-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.single-upload.is-hidden {
+  display: none;
+}
+
 .compare-upload {
   margin-top: 18px;
 }
@@ -260,9 +271,58 @@ h2 {
   display: none;
 }
 
-.compare-upload input {
+.compare-file-picker {
+  display: grid;
   width: 100%;
+}
+
+.native-file-input {
+  display: none !important;
+}
+
+.compare-file-button {
+  display: grid;
+  min-height: 72px;
+  width: 100%;
+  padding: 14px 16px;
+  gap: 5px;
+  place-items: center;
+  color: var(--text);
+  font-weight: 800;
+  border: 1px solid rgba(45, 212, 191, 0.32);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(45, 212, 191, 0.13), rgba(34, 197, 94, 0.08)),
+    rgba(4, 17, 15, 0.36);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(238, 252, 247, 0.03);
+  transition: border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.compare-file-button:hover,
+.compare-file-button:focus-visible {
+  border-color: var(--accent);
+  background:
+    linear-gradient(135deg, rgba(45, 212, 191, 0.2), rgba(34, 197, 94, 0.12)),
+    rgba(4, 17, 15, 0.42);
+  box-shadow: 0 16px 34px rgba(34, 197, 94, 0.14);
+  transform: translateY(-1px);
+  outline: 3px solid rgba(45, 212, 191, 0.18);
+  outline-offset: 3px;
+}
+
+.compare-file-title {
+  color: var(--accent);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.compare-file-name {
   color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .selection-bar {

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Audio Analysis Lab</title>
-    <link rel="stylesheet" href="/static/app.css">
+    <link rel="stylesheet" href="/static/app.css?v=20260708-compare-upload">
   </head>
   <body>
     <a class="skip-link" href="#workspace">跳到上传区域</a>
@@ -29,16 +29,30 @@
             <button class="mode-button is-active" id="modeSingle" type="button">单文件分析</button>
             <button class="mode-button" id="modeCompare" type="button">A/B 对比</button>
           </div>
-          <div class="upload-icon" aria-hidden="true">
-            <span></span>
+          <div class="single-upload" id="singleUploadPanel">
+            <div class="upload-icon" aria-hidden="true">
+              <span></span>
+            </div>
+            <input id="fileInput" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,audio/*" hidden>
+            <button class="upload-button" id="uploadButton" type="button">选择音频文件</button>
+            <p id="fileLabel">也可以把文件拖到这里</p>
           </div>
-          <input id="fileInput" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,audio/*" hidden>
-          <button class="upload-button" id="uploadButton" type="button">选择音频文件</button>
-          <p id="fileLabel">也可以把文件拖到这里</p>
           <p class="status" id="statusText" aria-live="polite">等待上传</p>
           <div class="compare-upload is-hidden" id="compareUploadPanel">
-            <input id="compareFileA" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,audio/*">
-            <input id="compareFileB" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,audio/*">
+            <div class="compare-file-picker">
+              <input class="native-file-input" id="compareFileA" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,audio/*" hidden>
+              <button class="compare-file-button" id="compareFileAButton" type="button">
+                <span class="compare-file-title">A 文件</span>
+                <span class="compare-file-name" id="compareFileAName">点击选择音频</span>
+              </button>
+            </div>
+            <div class="compare-file-picker">
+              <input class="native-file-input" id="compareFileB" type="file" accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,audio/*" hidden>
+              <button class="compare-file-button" id="compareFileBButton" type="button">
+                <span class="compare-file-title">B 文件</span>
+                <span class="compare-file-name" id="compareFileBName">点击选择音频</span>
+              </button>
+            </div>
             <button class="upload-button" id="compareButton" type="button">开始 A/B 对比</button>
           </div>
         </div>
@@ -123,6 +137,6 @@
         <div class="metadata-grid" id="metadataGrid" aria-live="polite"></div>
       </section>
     </main>
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=20260708-compare-upload"></script>
   </body>
 </html>

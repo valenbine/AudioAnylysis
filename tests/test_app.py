@@ -29,6 +29,13 @@ def test_index_page_loads():
     assert "data-view=\"spectrogram\"" in html
     assert "data-view=\"features\"" in html
     assert "modeCompare" in html
+    assert "singleUploadPanel" in html
+    assert "compareFileAButton" in html
+    assert "compareFileAName" in html
+    assert "compareFileBButton" in html
+    assert "compareFileBName" in html
+    assert "点击选择音频" in html
+    assert "未选择文件" not in html
     assert "analyzeSelectionButton" in html
     assert "exportMarkdownButton" in html
     assert "exportJsonButton" in html

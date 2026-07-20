@@ -3,9 +3,14 @@ const uploadButton = document.querySelector("#uploadButton");
 const dropZone = document.querySelector("#dropZone");
 const modeSingle = document.querySelector("#modeSingle");
 const modeCompare = document.querySelector("#modeCompare");
+const singleUploadPanel = document.querySelector("#singleUploadPanel");
 const compareUploadPanel = document.querySelector("#compareUploadPanel");
 const compareFileA = document.querySelector("#compareFileA");
 const compareFileB = document.querySelector("#compareFileB");
+const compareFileAButton = document.querySelector("#compareFileAButton");
+const compareFileBButton = document.querySelector("#compareFileBButton");
+const compareFileAName = document.querySelector("#compareFileAName");
+const compareFileBName = document.querySelector("#compareFileBName");
 const compareButton = document.querySelector("#compareButton");
 const fileLabel = document.querySelector("#fileLabel");
 const statusText = document.querySelector("#statusText");
@@ -122,6 +127,7 @@ function setMode(mode) {
   currentMode = mode;
   modeSingle.classList.toggle("is-active", mode === "single");
   modeCompare.classList.toggle("is-active", mode === "compare");
+  singleUploadPanel.classList.toggle("is-hidden", mode !== "single");
   compareUploadPanel.classList.toggle("is-hidden", mode !== "compare");
   comparisonPanel.classList.toggle("is-hidden", mode !== "compare" || !currentComparison);
 }
@@ -1077,6 +1083,10 @@ function downloadText(filename, text) {
   URL.revokeObjectURL(url);
 }
 
+function updateCompareFileName(input, label) {
+  label.textContent = input.files[0]?.name || "点击选择音频";
+}
+
 async function compareFiles() {
   const fileA = compareFileA.files[0];
   const fileB = compareFileB.files[0];
@@ -1132,6 +1142,10 @@ function renderComparison(comparison) {
 modeSingle.addEventListener("click", () => setMode("single"));
 modeCompare.addEventListener("click", () => setMode("compare"));
 compareButton.addEventListener("click", compareFiles);
+compareFileAButton.addEventListener("click", () => compareFileA.click());
+compareFileBButton.addEventListener("click", () => compareFileB.click());
+compareFileA.addEventListener("change", () => updateCompareFileName(compareFileA, compareFileAName));
+compareFileB.addEventListener("change", () => updateCompareFileName(compareFileB, compareFileBName));
 analyzeSelectionButton.addEventListener("click", analyzeSelectedRange);
 clearSelectionButton.addEventListener("click", () => {
   selectedRange = null;
